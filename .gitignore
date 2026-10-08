@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+bookworld_final.db
+__pycache__/
+*.py[cod]
