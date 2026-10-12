@@ -15,7 +15,6 @@ REFERENCE_DB_PATH_SCHEMA = BASE_PATH / "schema_final.sql"
 
 ## Fonction Extract : Extraction des données depuis les sources (csv, web, db)
 def extract():
-  global sales, df_catalogue, df_channels, df_countries, taux_gbp,df_category_rules
   try:
     sales = extract_csv()
     taux_gbp = Obtenir_Tx_Change()
@@ -25,7 +24,7 @@ def extract():
   except Exception as e:
     print(f"Erreur durant l'extraction: {e}")
     raise
-  return
+  return sales, df_catalogue, df_countries, df_channels, taux_gbp
 
 ## Sous-fonction Extract_csv : Extraction des données depuis le fichier CSV
 def extract_csv():
@@ -89,11 +88,11 @@ def extract_db():
   return df_channels, df_countries,df_category_rules
 
 ## Fonction Transform : Transformation des données extraites pour les préparer à l'insertion dans la base de données finale
-def transform(sales,df_catalogue,df_countries,df_channels):
+def transform(sales,df_catalogue ,df_countries ,df_channels, taux_gbp):
     sales = suprimer_colonnes_inutiles(sales)
     df_temp = fusionner_tables(sales,df_catalogue,df_countries,df_channels)
-    convertir_prix(df_temp,taux_gbp)
-    identifier_pays_inconnus(df_temp)
+    df_temp = convertir_prix(df_temp,taux_gbp)
+    df_temp = identifier_pays_inconnus(df_temp)
     return df_temp
 
 ## Traitement RGPD : Supprimer les colonnes inutiles pour la base de données finale
@@ -105,7 +104,7 @@ def suprimer_colonnes_inutiles(sales):
 ## qui servira à l'agrégation des ventes par pays et à l'insertion dans la base de données finale.
 def fusionner_tables(sales,df_catalogue,df_countries,df_channels):
   nb_lignes_avant = len(sales)
-  df_temp = pd.merge(sales, df_catalogue, left_on='book_name', right_on='Title')
+  df_temp = pd.merge(sales, df_catalogue, left_on='book_name', right_on='Title',validate="many_to_one")
   df_temp = pd.merge(df_temp, df_countries, on='country_code', how='left', suffixes=('_books', '_country'))
   df_temp = pd.merge(df_temp, df_channels, on='channel_code', how='left', suffixes=('_country', '_channel'))
   nb_lignes_apres = len(df_temp)
@@ -131,6 +130,12 @@ def convertir_prix(df_temp,taux_gbp):
     df_temp['revenu (EUR)'] = df_temp["quantity"]*df_temp['Price (Eur)']*(1-df_temp["discount_rate"])
   print(f"Calcul du CA terminé : EUR : {df_temp['revenu (EUR)'].sum()} GBP :{ df_temp['revenu (GBP)'].sum()}")
   return df_temp
+
+## Construire le cataloguebook a partir du dataframe df_temp et du dataframe df_catalogue
+def construire_catalogue(df_temp):
+  df_catalogue = df_temp[['book_id', 'Title', 'Price']].drop_duplicates()
+  print(f"Catalogue construit : {df_catalogue.shape[0]} livres")
+  return df_catalogue
 
 ## Créer l'agrégation des ventes par pays à partir du DataFrame df_temp
 def create_aggregation(df_temp):
@@ -174,11 +179,17 @@ def load_to_database(df_countries, sales_by_country, df_channels, df_catalogue, 
         "total_revenue_gbp",
         "total_revenue_eur"
     ]].to_sql(
-        "sales-by-country",   # nom de la table dans schema_final.sql
+        "sales_by_country",   # nom de la table dans schema_final.sql
         conn,
         if_exists="append",   # on AJOUTE dans la table existante
         index=False           # on n'envoie pas l'index pandas
     )                                                      # étape 3
+    df_catalogue.to_sql(
+            "catalogue",          # nom de la table dans schema_final.sql
+            conn,
+            if_exists="append",   # on AJOUTE dans la table existante
+            index=False           # on n'envoie pas l'index pandas
+        )   
     df_temp[[
         "order_id",
         "order_date",
@@ -195,21 +206,17 @@ def load_to_database(df_countries, sales_by_country, df_channels, df_catalogue, 
         if_exists="append",   # on AJOUTE dans la table existante
         index=False           # on n'envoie pas l'index pandas
     )
-    df_catalogue.to_sql(
-        "catalogue",          # nom de la table dans schema_final.sql
-        conn,
-        if_exists="append",   # on AJOUTE dans la table existante
-        index=False           # on n'envoie pas l'index pandas
-    )                                                      # étape 3
+                                                      # étape 3
     conn.commit()
     conn.close()
 
 ## Appeler la fonction main pour exécuter le pipeline ETL
 def main():
-  extract()
-  df_temp = transform(sales, df_catalogue,df_countries,df_channels)
+  sales, df_catalogue, df_countries, df_channels, taux_gbp = extract()
+  df_temp = transform(sales, df_catalogue,df_countries,df_channels,taux_gbp)
   sales_by_country = create_aggregation(df_temp)
-  load_to_database(df_countries, sales_by_country, df_channels, df_catalogue, df_temp)
+  catalogue_final =construire_catalogue(df_temp)
+  load_to_database(df_countries, sales_by_country, df_channels, catalogue_final, df_temp)
   
 ## Appeler la fonction main si le script est exécuté directement
 if __name__== "__main__":

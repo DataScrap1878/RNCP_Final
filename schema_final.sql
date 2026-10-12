@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS "sales-by-country";
+DROP TABLE IF EXISTS "sales_by_country";
 DROP TABLE IF EXISTS sales;
 DROP TABLE IF EXISTS catalogue;
 DROP TABLE IF EXISTS channels;
@@ -18,7 +18,7 @@ CREATE TABLE channels (
     is_active INTEGER NOT NULL
 );
 
-CREATE TABLE "sales-by-country" (
+CREATE TABLE "sales_by_country" (
     country_code TEXT PRIMARY KEY,
     country_name TEXT,
     total_orders INTEGER,
@@ -27,6 +27,11 @@ CREATE TABLE "sales-by-country" (
     total_revenue_eur REAL
 );
 
+CREATE TABLE catalogue (
+    Book_id TEXT PRIMARY KEY,
+    Title TEXT not NULL,
+    Price real
+);
 CREATE TABLE sales (
     order_id TEXT PRIMARY KEY,
     order_date TEXT,
@@ -38,10 +43,9 @@ CREATE TABLE sales (
     "revenu (GBP)" REAL,
     "revenu (EUR)" REAL,
     FOREIGN KEY (channel_code) REFERENCES channels(channel_code)
+    foreign key (book_id) references catalogue(book_id)
     -- Pas de FK sur country_code : référentiel pays incomplet (NL absent)
+    -- Suggérer de mettre à jour le référentiel pays pour inclure tous les pays présents dans les ventes
 );
 
-CREATE TABLE catalogue (
-    Title TEXT,
-    Price TEXT
-);
+
