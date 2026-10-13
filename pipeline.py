@@ -14,12 +14,13 @@ REFERENCE_DB_PATH_SCHEMA = BASE_PATH / "schema_final.sql"
 
 
 ## Fonction Extract : Extraction des données depuis les sources (csv, web, db)
+## Nous ne chargerons pas Category_rules car il ne sera pas utilisé (faute d'information extraite du scrapping)
 def extract():
   try:
     sales = extract_csv()
     taux_gbp = Obtenir_Tx_Change()
     df_catalogue = scrape_books()
-    df_channels, df_countries,df_category_rules = extract_db()
+    df_channels, df_countries = extract_db()
     print("Extraction complêtement réussie")
   except Exception as e:
     print(f"Erreur durant l'extraction: {e}")
@@ -69,14 +70,14 @@ def scrape_books():
     return df_catalogue
 
 ## Fonction Extract_db : Extraction des données depuis la base de données SQLite
-## Extraction des 3 bases de données : channels, countries et category_rules
+## Extraction des 2 bases de données : channels, countries
 ## Nous utiliserons seulement les tables channels et countries pour la suite du projet.
 def extract_db():
   try:
     conn = sqlite3.connect(REFERENCE_DB_PATH_REFERENCE)
-    df_channels = pd.read_sql_query("SELECT * FROM channels;", conn)
-    df_countries = pd.read_sql_query("SELECT * FROM countries;", conn)
-    df_category_rules = pd.read_sql_query("SELECT * FROM category_rules", conn)
+    df_channels = pd.read_sql_query("SELECT channel_code, channel_name, channel_group, acquisition_cost_gbp, is_active FROM channels;", conn)
+    df_countries = pd.read_sql_query("SELECT country_code, country_name, region, is_active FROM countries;", conn)
+   
   except sqlite3.Error as e:
     print(f"Erreur SQLite : {e}")
     return None, None, None
@@ -85,7 +86,7 @@ def extract_db():
     return None, None, None
   conn.close()
   print("Extraction db réussie")
-  return df_channels, df_countries,df_category_rules
+  return df_channels, df_countries
 
 ## Fonction Transform : Transformation des données extraites pour les préparer à l'insertion dans la base de données finale
 def transform(sales,df_catalogue ,df_countries ,df_channels, taux_gbp):
