@@ -58,7 +58,7 @@ def health_check():
 def sales_by_country():
     try:
         conn = get_connection()
-        query = 'SELECT * FROM "sales_by_country"'
+        query = 'SELECT * FROM "sales_by_country" order by total_revenue_eur desc'
         df = pd.read_sql_query(query, conn)
         conn.close()
         return jsonify(df.to_dict(orient="records")), 200

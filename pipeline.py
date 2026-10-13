@@ -146,7 +146,7 @@ def create_aggregation(df_temp):
           total_quantity=("quantity", "sum"),
           total_revenue_gbp=("revenu (GBP)", "sum"),
           total_revenue_eur=("revenu (EUR)", "sum")
-      )
+      ).round({"total_revenue_gbp": 2, "total_revenue_eur": 2}) ## on utilise le dictionnaire pour arrondir seulement le revenu total des colonnes
   )
   print(f"Aggregation terminée : {sales_by_country.shape}")
   return sales_by_country
