@@ -28,24 +28,25 @@ CREATE TABLE "sales_by_country" (
 );
 
 CREATE TABLE catalogue (
-    Book_id TEXT PRIMARY KEY,
+    book_id TEXT PRIMARY KEY,
     Title TEXT not NULL,
     Price real
 );
 CREATE TABLE sales (
     order_id TEXT PRIMARY KEY,
     order_date TEXT,
-    book_id TEXT,
+    book_id TEXT not null,
     country_code TEXT NOT NULL,
     channel_code TEXT NOT NULL,
     quantity INTEGER,
     discount_rate REAL,
     "revenu (GBP)" REAL,
     "revenu (EUR)" REAL,
-    FOREIGN KEY (channel_code) REFERENCES channels(channel_code)
+    FOREIGN KEY (channel_code) REFERENCES channels(channel_code),
     foreign key (book_id) references catalogue(book_id)
     -- Pas de FK sur country_code : référentiel pays incomplet (NL absent)
     -- Suggérer de mettre à jour le référentiel pays pour inclure tous les pays présents dans les ventes
+    -- La Primary Key book_id du Catalogue a été construite a partir d'un lien sur le nom du livre avec la table Sales
 );
 
 

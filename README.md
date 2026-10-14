@@ -1,107 +1,122 @@
-# Projet de données de ventes Bookworld
+# BookWorld – Pipeline de données et API des ventes par pays
 
-Ce projet comprend un pipeline de données et une API Flask pour traiter les données de ventes de Bookworld. Le pipeline combine le fichier CSV des ventes avec les prix des livres récupérés sur Books to Scrape et les données de référence stockées dans SQLite, calcule les ventes en GBP et en EUR, puis enregistre les résultats pour l'API.
+Projet réalisé dans le cadre de l'examen final RNCP Data Analyst.
+
+Bookworld est une entreprise fictive de vente de livres en ligne. Ce projet construit un pipeline de données qui :
+
+1. **.*collecte*.** des données depuis quatre sources : un fichier CSV de ventes, une base SQLite avec le référentiels (pays, canal et categorie), la première page du site [books.toscrape.com](https://books.toscrape.com/) (prix des livres) et l'API publique de taux de change [Frankfurter](https://frankfurter.dev/) (taux de change GBP → EUR) ;
+2. **.*nettoyage - enrichissement*.** les ventes (suppression des données personnelles, prix, pays, conversion en euros) ;
+3. **.*chargement*.** le résultat dans une base SQLite finale, modélisée en schéma en étoile ;
+4. **.*exposition par API Rest*.** l'indicateur des ventes agrégées par pays par le biais d'une API REST protégée par token.
 
 ## Fichiers du projet
 
 | Fichier | Rôle |
 | --- | --- |
-| `RNCP_query.py` | Extrait, transforme, agrège et charge les données de ventes |
-| `app.py` | API Flask permettant de vérifier la base de données et de récupérer les données de ventes |
-| `sales_raw.csv` | Fichier source des ventes |
-| `bookworld_reference.db` | Tables de référence des pays, des canaux et des règles de catégorisation |
-| `schema_final.sql` | Schéma utilisé pour créer les tables de sortie |
-| `bookworld_final.db` | Base SQLite générée localement par le pipeline et lue par l'API ; elle n'est pas incluse dans le dépôt GitHub |
+| `pipeline.py` | Pipeline ETL : extraction des 4 sources, transformation, agrégation et chargement dans la base finale |
+| `api.py` | API REST Flask exposant les données de la base finale sur une adresse http |
+| `schema_final.sql` | Structure de la base finale (tables, et clés primaires/étrangères), exécutée par le pipeline |
+| `queries.sql` | Quelques requêtes SQL du projet : extraction/enrichissement, filtres, contrôle qualité et analyses |
+| `verif_db.py` | Script de contrôle : affiche les tables et colonnes de la base finale |
+| `sales_raw.csv` | Source : ventes brutes itemisées par commande |
+| `bookworld_reference.db` | Source : référentiels pays,  canaux de vente et la base Catégorie qui ne sera toutefois pas utilisée - La base est en lecture seule et n'est pas modifiée par le pipeline |
+| `.env.example` | Modèle du fichier de configuration du token (valeur fictive) |
+| `requirements.txt` | Dépendances Python |
 
-## Prérequis
+La base `bookworld_final.db` est **créée** par le pipeline. Elle n'est pas incluse dans le GitHub (listée `.gitignore`) - Il sera donc nécessaire d'exécuter le pipeline après avoir cloné le dépôt, pour générer `bookworld_final.db`.
 
-- Python 3
-- Les packages Python `pandas`, `requests`, `beautifulsoup4`, `Flask` et `python-dotenv`
-- Un accès à Internet lors de l'exécution du pipeline, pour récupérer le taux de change GBP/EUR et les prix des livres
+## Installation
 
-Installez les packages :
+Prérequis : Python 3 et un accès Internet (le pipeline interroge le site [books.toscrape.com] et l'API [Frankfurter]de taux de change).
 
 ```bash
+git clone https://github.com/DataScrap1878/RNCP_Final.git
+cd RNCP_Final
 python -m pip install -r requirements.txt
 ```
 
-## Configurer le jeton API
+## Configuration du token API
 
-L'API lit le jeton attendu depuis la variable d'environnement `API_TOKEN`. Pour le configurer localement sans l'inscrire dans le code :
+L'API lit le token attendu dans la variable d'environnement `API_TOKEN`, chargée depuis un fichier `.env` local.
 
-1. Dans PowerShell, copiez le fichier d'exemple : `Copy-Item .env.example .env`.
-2. Remplacez la valeur de `API_TOKEN` dans `.env` par un jeton secret. Le fichier doit contenir une ligne de la forme `API_TOKEN=votre-jeton-secret`.
-3. Ne partagez pas et n'ajoutez pas `.env` à Git : ce fichier est ignoré par `.gitignore`.
+1. Copier le modèle : `cp .env.example .env` (PowerShell : `Copy-Item .env.example .env`).
+2. Remplacer la valeur dans `.env` : `API_TOKEN=<votre_mot_de_passe>`.
 
-Vous pouvez générer un jeton aléatoire avec Python :
+Le fichier `.env` est exclu de Git par `.gitignore` : le vrai token n'est jamais publié. Après toute modification de `.env`, redémarrer l'API, car le fichier n'est lu qu'au démarrage.
 
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+## Exécuter le pipeline
 
-Lors d'un appel à `GET /sales_details/<country>`, envoyez ce même jeton dans l'en-tête HTTP :
-
-```text
-Authorization: Bearer <votre-jeton-secret>
-```
-
-Le fichier `.env.example` ne contient qu'une valeur fictive. Il faut créer le fichier `.env` local avant de démarrer l'API pour que le jeton soit configuré. Si `.env` existe déjà, modifiez-le au lieu de recopier le fichier d'exemple. Après toute modification de `.env`, arrêtez puis redémarrez Flask pour qu'il recharge la variable.
-
-Pour appeler la route protégée `GET /sales_details/<country>` depuis PowerShell, utilisez `curl.exe` et remplacez `VOTRE_JETON` par la valeur configurée dans `.env` :
-
-```powershell
-curl.exe -H "Authorization: Bearer VOTRE_JETON" "http://127.0.0.1:5000/sales_details/Netherlands"
-```
-
-Les routes publiques `/health`, `/sales_by_country` et `/sales_details` peuvent être ouvertes directement dans le navigateur. La barre d'adresse ne permet pas d'ajouter l'en-tête d'autorisation pour la route protégée. Pour la tester dans la console du navigateur (F12), exécutez :
-
-```javascript
-fetch("http://127.0.0.1:5000/sales_details/Netherlands", {
-  headers: { Authorization: "Bearer VOTRE_JETON" }
-})
-  .then(response => response.json())
-  .then(data => console.log(data));
-```
-
-Ne publiez jamais un vrai jeton dans du code JavaScript ou dans un dépôt Git. HTTP convient uniquement aux essais sur la machine locale, car il ne chiffre pas les données transmises. Pour un déploiement public, utilisez HTTPS et ne distribuez pas le jeton aux clients du navigateur.
-
-## Exécuter le pipeline de données
-
-Ouvrez un terminal dans le répertoire du projet (`RNCP`), puis exécutez :
+Depuis le dossier du projet :
 
 ```bash
-python RNCP_query.py
+python pipeline.py
 ```
 
-Le script lit `sales_raw.csv` et `bookworld_reference.db`, récupère les prix actuels des livres et le taux de change GBP/EUR, puis crée ou met à jour `bookworld_final.db` avec les ventes agrégées et le détail des ventes. Cette base est un résultat généré : elle est ignorée par Git et n'apparaît donc pas sur GitHub. Après avoir cloné le projet, exécutez le pipeline pour générer cette base avant de lancer l'API.
+Le pipeline :
 
-Le pipeline initialise les tables de sortie à l'aide de `schema_final.sql`. Ce schéma supprime puis recrée ces tables : chaque exécution remplace donc les données de sortie existantes.
+- lit les ventes (`sales_raw.csv`), les référentiels (`bookworld_reference.db`), le catalogue scrapé et le taux GBP → EUR du jour ;
+- supprime les noms et prénoms des clients (RGPD) ;
+- associe chaque vente à son prix (par le titre du livre) et à son pays ;
+- signale les codes pays absents du référentiel et les libelle `Inconnu (code)` ;
+- calcule le revenu de chaque vente : `quantité × prix × (1 − remise)`, en GBP et en EUR ;
+- recrée `bookworld_final.db` à partir de `schema_final.sql` et y charge les données.
+
+Chaque exécution remplace entièrement la base finale.
+
+Pour vérifier le résultat :
+
+```bash
+python verif_db.py
+```
 
 ## Lancer l'API
 
-Après avoir exécuté le pipeline, démarrez Flask depuis le même répertoire du projet :
+Après avoir exécuté le pipeline :
 
 ```bash
-python app.py
+python api.py
 ```
 
-Par défaut, Flask s'exécute en mode débogage à l'adresse `http://127.0.0.1:5000`.
+L'API démarre sur `http://127.0.0.1:5000`. Elle ouvre la base finale en **lecture seule**.
 
-### Points de terminaison
+### Endpoints
 
-| Méthode | Point de terminaison | Description |
-| --- | --- | --- |
-| `GET` | `/health` | Vérifie que l'API peut ouvrir la base de données de sortie |
-| `GET` | `/sales_by_country` | Renvoie les ventes agrégées par pays |
-| `GET` | `/sales_details` | Renvoie le détail des ventes traitées |
-| `GET` | `/sales_details/<country>` | Renvoie le détail des ventes pour un pays donné |
+| Méthode | Route | Token | Description | Codes de réponse |
+| --- | --- | --- | --- | --- |
+| `GET` | `/health` | Non | Vérifie que la base est accessible et que la table `sales_by_country` est lisible ; renvoie son nombre de lignes | `200` OK · `503` base indisponible |
+| `GET` | `/sales-by-country` | **Oui** | Renvoie les ventes agrégées par pays, triées par chiffre d'affaires décroissant | `200` OK · `401` token absent ou invalide · `500` erreur serveur |
 
-Exemples de requêtes :
+Champs renvoyés par `/sales-by-country` : `country_code`, `country_name`, `total_orders`, `total_quantity`, `total_revenue_gbp`, `total_revenue_eur`.
 
-```text
-http://127.0.0.1:5000/health
-http://127.0.0.1:5000/sales_by_country
-http://127.0.0.1:5000/sales_details/Netherlands
+### Exemples d'appels
+
+```bash
+# Contrôle de santé (sans token)
+curl http://127.0.0.1:5000/health
+
+# Sans token : refusé (401)
+curl http://127.0.0.1:5000/sales-by-country
+
+# Avec token : liste des pays (affichage formaté)
+curl -s -H "Authorization: Bearer <votre_token>" http://127.0.0.1:5000/sales-by-country | python -m json.tool
 ```
 
-Le point de terminaison filtré par pays accepte actuellement les pays répertoriés dans `app.py`, notamment les Pays-Bas, la France, l'Allemagne, l'Italie, le Royaume-Uni et les États-Unis. Dans l'URL, utilisez le nom du pays en anglais, par exemple `Netherlands`.
+Le token se transmet dans l'en-tête HTTP `Authorization: Bearer <token>`. Le serveur de développement Flask (HTTP, mode debug) est réservé à un usage local seulement.
+
+## Base finale
+
+Schéma en étoile : une table de faits (`sales`), trois dimensions (`countries`, `channels`, `catalogue`) et l'agrégat exposé par l'API (`sales_by_country`).
+
+| Table | Contenu |
+| --- | --- |
+| `sales` | Une ligne par commande : date, clés vers le livre, le pays et le canal, quantité, remise, revenus GBP et EUR |
+| `countries` | Référentiel des pays (code, nom, région) |
+| `channels` | Référentiel des canaux de vente (code, nom, groupe, coût d'acquisition) |
+| `catalogue` | Livres vendus (identifiant, titre, prix en GBP)|
+| `sales_by_country` | Indicateur agrégé par pays : nombre de commandes, quantités, revenus GBP et EUR |
+
+- **RGPD** : les noms et prénoms des clients, présents dans les données brutes, sont supprimés dès le début de la transformation et ne sont jamais stockés dans la base finale.
+- **Clés étrangères** : `sales.book_id` → `catalogue` et `sales.channel_code` → `channels`. Le lien `sales.country_code` → `countries` n'est pas contraint, car le référentiel pays est incomplet (NL absent). Les ventes concernées sont conservées et libellées `Inconnu (NL)`. Une requête de contrôle dans `queries.sql` liste ces pays.
+
+
+![Structure de la base finale](schema_final.png)
