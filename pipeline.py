@@ -34,7 +34,7 @@ def extract_csv():
 
 ## Sous-fonction Obtenir_Tx_Change : Extraction du taux de change depuis l'API Frankfurter
 def Obtenir_Tx_Change():
-  url = "https://api.frankfurter.dev/v2/rate/gb/eur"
+  url = "https://api.frankfurter.dev/v2/rate/gbp/eur"
   response = req.get(url)
 
   if response.status_code == 200:

@@ -1,6 +1,6 @@
 import os
 from functools import wraps
-from secrets import compare_digest
+from secrets import compare_digest ## compare_digest est utilisé pour comparer les tokens de manière sécurisée afin d'éviter les attaques par timing.
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
@@ -8,11 +8,15 @@ from flask import Flask, jsonify, request
 import sqlite3
 import pandas as pd
 
+## Chargement des variables d'environnement depuis le fichier .env
 load_dotenv()
 
+## Définition des chemins pour la base de données
+## .parent permet de remonter d'un niveau dans l'arborescence des dossiers pour accéder au fichier de base de données.
+## par exemple ici bookworld_final.db est dans le même dossier que api.py, donc on remonte d'un niveau pour accéder à ce fichier.
 BASE_PATH = Path(__file__).resolve().parent
 DB_PATH = BASE_PATH / 'bookworld_final.db'
-app = Flask(__name__)
+app = Flask(__name__) ## création de l'application Flask afin de créer des endpoints pour l'API
 
 ## Connexion a la base de données en lecture seule
 ## Cela permet d'éviter de créer un fichier vide si la base de données n'existe pas
@@ -25,7 +29,7 @@ def get_connection():
 def token_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        expected_token = os.environ.get("API_TOKEN")
+        expected_token = os.environ.get("API_TOKEN") ## Récupération du token attendu depuis les variables d'environnement
         if not expected_token:
             return jsonify({"message": "Token API non configuré côté serveur"}), 500
 
@@ -59,7 +63,7 @@ def sales_by_country():
     try:
         conn = get_connection()
         query = 'SELECT * FROM "sales_by_country" order by total_revenue_eur desc'
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query(query, conn) 
         conn.close()
         return jsonify(df.to_dict(orient="records")), 200
     except Exception as e:
