@@ -34,7 +34,7 @@ def extract_csv():
 
 ## Sous-fonction Obtenir_Tx_Change : Extraction du taux de change depuis l'API Frankfurter
 def Obtenir_Tx_Change():
-  url = "https://api.frankfurter.dev/v2/rate/gbp/eur"
+  url = "https://api.frankfurter.dev/v2/rate/gb/eur"
   response = req.get(url)
 
   if response.status_code == 200:
@@ -44,8 +44,7 @@ def Obtenir_Tx_Change():
       print(f"Extraction du taux de change réussie : {taux_gbp} en date du : {date_taux}")
       return taux_gbp
   else:
-      print("Impossible de récupérer le taux de change.")
-      return None
+      raise ValueError(f"Erreur lors de l'extraction du taux de change : {response.status_code} - {response.text}")
 
 ## Sous-fonction scrape_books : Extraction des données depuis le site web Books to Scrape
 ## Uniquement la première page est extraite pour l'exemple.
@@ -80,10 +79,10 @@ def extract_db():
    
   except sqlite3.Error as e:
     print(f"Erreur SQLite : {e}")
-    return None, None, None
+    return None, None
   except Exception as e:
     print(f"Erreur inattendue : {e}")
-    return None, None, None
+    return None, None
   conn.close()
   print("Extraction db réussie")
   return df_channels, df_countries
@@ -124,10 +123,10 @@ def identifier_pays_inconnus(df_temp):
 ## Convertir les prix en EUR et calculer le revenu total par ligne de commande
 def convertir_prix(df_temp,taux_gbp):
   df_temp['Price'] = df_temp['Price'].astype(str).str.replace('£', '').astype(float)
+  df_temp['revenu (GBP)'] = df_temp["quantity"]*df_temp['Price']*(1-df_temp["discount_rate"])
   if taux_gbp is not None:
     df_temp['Price (Eur)'] = df_temp['Price'] * taux_gbp
     df_temp['Acquisition cost (Eur)'] = df_temp['acquisition_cost_gbp'] * taux_gbp
-    df_temp['revenu (GBP)'] = df_temp["quantity"]*df_temp['Price']*(1-df_temp["discount_rate"])
     df_temp['revenu (EUR)'] = df_temp["quantity"]*df_temp['Price (Eur)']*(1-df_temp["discount_rate"])
   print(f"Calcul du CA terminé : EUR : {df_temp['revenu (EUR)'].sum()} GBP :{ df_temp['revenu (GBP)'].sum()}")
   return df_temp

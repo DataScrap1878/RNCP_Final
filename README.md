@@ -119,4 +119,4 @@ Schéma en étoile : une table de faits (`sales`), trois dimensions (`countries`
 - **Clés étrangères** : `sales.book_id` → `catalogue` et `sales.channel_code` → `channels`. Le lien `sales.country_code` → `countries` n'est pas contraint, car le référentiel pays est incomplet (NL absent). Les ventes concernées sont conservées et libellées `Inconnu (NL)`. Une requête de contrôle dans `queries.sql` liste ces pays.
 
 
-![Structure de la base finale](schema_final.png)
+![Structure de la base finale](images/schema_final.png)
