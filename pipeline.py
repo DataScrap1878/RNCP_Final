@@ -105,7 +105,7 @@ def suprimer_colonnes_inutiles(sales):
 def fusionner_tables(sales,df_catalogue,df_countries,df_channels):
   nb_lignes_avant = len(sales)
   df_temp = pd.merge(sales, df_catalogue, left_on='book_name', right_on='Title',validate="many_to_one")
-  df_temp = pd.merge(df_temp, df_countries, on='country_code', how='left', suffixes=('_books', '_country'))
+  df_temp = pd.merge(df_temp, df_countries, on='country_code', how='left')
   df_temp = pd.merge(df_temp, df_channels, on='channel_code', how='left', suffixes=('_country', '_channel'))
   nb_lignes_apres = len(df_temp)
   print(f"Fusion des tables terminée : {nb_lignes_avant} lignes avant, {nb_lignes_apres} lignes après")
@@ -124,10 +124,9 @@ def identifier_pays_inconnus(df_temp):
 def convertir_prix(df_temp,taux_gbp):
   df_temp['Price'] = df_temp['Price'].astype(str).str.replace('£', '').astype(float)
   df_temp['revenu (GBP)'] = df_temp["quantity"]*df_temp['Price']*(1-df_temp["discount_rate"])
-  if taux_gbp is not None:
-    df_temp['Price (Eur)'] = df_temp['Price'] * taux_gbp
-    df_temp['Acquisition cost (Eur)'] = df_temp['acquisition_cost_gbp'] * taux_gbp
-    df_temp['revenu (EUR)'] = df_temp["quantity"]*df_temp['Price (Eur)']*(1-df_temp["discount_rate"])
+  df_temp['Price (Eur)'] = df_temp['Price'] * taux_gbp
+  df_temp['Acquisition cost (Eur)'] = df_temp['acquisition_cost_gbp'] * taux_gbp
+  df_temp['revenu (EUR)'] = df_temp["quantity"]*df_temp['Price (Eur)']*(1-df_temp["discount_rate"])
   print(f"Calcul du CA terminé : EUR : {df_temp['revenu (EUR)'].sum()} GBP :{ df_temp['revenu (GBP)'].sum()}")
   return df_temp
 
@@ -159,7 +158,7 @@ def load_to_database(df_countries, sales_by_country, df_channels, df_catalogue, 
     schema_sql = REFERENCE_DB_PATH_SCHEMA 
     conn.executescript(schema_sql.read_text(encoding="utf-8"))              # étape 2
 
-    df_countries[["country_code", "country_name", "region"]].to_sql(
+    df_countries[["country_code", "country_name", "region","is_active"]].to_sql(
         "countries",          # nom de la table dans schema_final.sql
         conn,
         if_exists="append",   # on AJOUTE dans la table existante

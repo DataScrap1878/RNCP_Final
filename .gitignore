@@ -5,3 +5,5 @@ bookworld_final.db
 __pycache__/
 *.py[cod]
 resultat_api.json
+*.docx
+~$*

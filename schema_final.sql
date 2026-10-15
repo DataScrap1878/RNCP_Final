@@ -7,7 +7,8 @@ DROP TABLE IF EXISTS countries;
 CREATE TABLE countries (
     country_code TEXT PRIMARY KEY,
     country_name TEXT NOT NULL,
-    region TEXT
+    region TEXT,
+    is_active INTEGER
 );
 
 CREATE TABLE channels (
@@ -18,6 +19,7 @@ CREATE TABLE channels (
     is_active INTEGER NOT NULL
 );
 
+-- Table d'agrégat calculée par le pipeline : pas de FK (contient aussi NL, absent de countries)
 CREATE TABLE "sales_by_country" (
     country_code TEXT PRIMARY KEY,
     country_name TEXT,
@@ -29,13 +31,14 @@ CREATE TABLE "sales_by_country" (
 
 CREATE TABLE catalogue (
     book_id TEXT PRIMARY KEY,
-    Title TEXT not NULL,
-    Price real
+    Title TEXT NOT NULL,
+    Price REAL
 );
+
 CREATE TABLE sales (
     order_id TEXT PRIMARY KEY,
     order_date TEXT,
-    book_id TEXT not null,
+    book_id TEXT NOT NULL,
     country_code TEXT NOT NULL,
     channel_code TEXT NOT NULL,
     quantity INTEGER,
@@ -43,10 +46,8 @@ CREATE TABLE sales (
     "revenu (GBP)" REAL,
     "revenu (EUR)" REAL,
     FOREIGN KEY (channel_code) REFERENCES channels(channel_code),
-    foreign key (book_id) references catalogue(book_id)
-    -- Pas de FK sur country_code : référentiel pays incomplet (NL absent)
-    -- Suggérer de mettre à jour le référentiel pays pour inclure tous les pays présents dans les ventes
-    -- La Primary Key book_id du Catalogue a été construite a partir d'un lien sur le nom du livre avec la table Sales
+    FOREIGN KEY (book_id) REFERENCES catalogue(book_id)
+    -- Pas de FK sur country_code : référentiel pays incomplet (NL absent).
+    -- Mise à jour du référentiel pays à faire côté métier (hors pipeline).
+    -- book_id du catalogue : obtenu par jointure sur le titre entre ventes et catalogue scrapé.
 );
-
-
